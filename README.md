@@ -26,6 +26,9 @@ All encryption and decryption are performed locally in your browser. No data is 
 - The password never leaves your device.
 - The encrypted payload is safe to store or share publicly; only the password holder can decrypt it.
 
+> [!IMPORTANT]
+> Your password is the only protection. Use a strong, unique password with at least 12 characters, including uppercase, lowercase, numbers, and symbols. Never share your password over the same channel as the encrypted file (e.g., do not send both in the same email or chat message). If your password is weak or reused, the encryption will not protect you.
+
 ## Usage scenarios
 
 - Share environment variables with team members without exposing them in plain text.
