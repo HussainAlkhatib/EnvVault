@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><style>
+@font-face {
+  font-family: "Optimistic";
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url("/fonts/OptimisticAI_VF_Optimized.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Optimistic Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/OptimisticMono_W_TextRegular.woff2") format("woff2");
+}
+:where(html) {
+  font-family: "Optimistic", system-ui, sans-serif;
+}
+:where(code, pre, kbd, samp) {
+  font-family: "Optimistic Mono", ui-monospace, monospace;
+}
+</style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>EnvVault – Encrypt .env locally</title>
+<meta name="theme-color" content="#0a0f1c">
+<meta name="description" content="Encrypt .env files locally and share via QR. No server.">
+<link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22EnvVault%22%2C%22short_name%22%3A%22EnvVault%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230a0f1c%22%2C%22theme_color%22%3A%22%230a0f1c%22%7D">
+<style>
+  :root{
+    --bg:#0a0f1c;
+    --card:#111827;
+    --card-glass:rgba(17,24,39,0.75);
+    --accent:#3b82f6;
+    --accent-soft:rgba(59,130,246,0.18);
+    --success:#10b981;
+    --text:#e5e7eb;
+    --muted:#9ca3af;
+    --error:#ef4444;
+    --border:rgba(255,255,255,0.08);
+    --radius:16px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    background: radial-gradient(1200px 800px at 80% -20%, rgba(59,130,246,0.15), transparent 60%),
+                radial-gradient(800px 600px at 10% -10%, rgba(16,185,129,0.1), transparent 50%),
+                var(--bg);
+    color:var(--text);
+    font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing:antialiased;
+    line-height:1.4;
+  }
+  .wrap{max-width:840px;margin:0 auto;padding:0 16px 48px}
+  .header{text-align:center;padding:40px 0 20px;animation:fadeIn .6s ease both}
+  .logo{display:flex;align-items:center;justify-content:center;gap:10px}
+  .logo-mark{width:32px;height:32px;border-radius:10px;background:linear-gradient(145deg,#1e293b,#0b1220);border:1px solid var(--border);display:grid;place-items:center;box-shadow:0 4px 20px rgba(59,130,246,0.2), inset 0 1px 0 rgba(255,255,255,0.05)}
+  .logo-mark svg{width:18px;height:18px;stroke:var(--accent)}
+  h1{margin:0;font-size:28px;font-weight:600;letter-spacing:-0.02em}
+  .tagline{margin:8px 0 0;color:var(--muted);font-size:15px}
+
+  .tabs{position:relative;display:flex;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:14px;padding:4px;max-width:380px;margin:12px auto 24px;backdrop-filter:blur(12px)}
+  .tab{flex:1;background:transparent;border:0;color:var(--muted);padding:10px 14px;border-radius:10px;font-weight:500;font-size:14px;cursor:pointer;transition:all .2s ease}
+  .tab.active{color:white;background:var(--accent-soft);box-shadow:inset 0 0 0 1px rgba(59,130,246,0.3)}
+  
+  .panels{position:relative;min-height:480px}
+  .panel{display:none;opacity:0;transform:translateY(8px)}
+  .panel.active{display:block;animation:panelIn .35s ease forwards}
+  @keyframes panelIn{to{opacity:1;transform:translateY(0)}}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+  .card{
+    background:var(--card-glass);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:20px;
+    margin-bottom:16px;
+    backdrop-filter:blur(20px);
+    box-shadow:0 10px 40px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.03);
+    animation:fadeIn .5s ease both;
+  }
+  .card.result{border-color:rgba(59,130,246,0.25)}
+
+  .label{display:block;font-size:13px;color:var(--muted);margin:0 0 8px;font-weight:500}
+  textarea, input[type="password"], input[type="text"]{
+    width:100%;background:#0b1220;color:var(--text);border:1px solid rgba(255,255,255,0.1);
+    border-radius:12px;padding:12px 14px;font-size:14px;outline:none;transition:border .15s, box-shadow .15s;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+  textarea{resize:vertical;min-height:120px;line-height:1.5}
+  textarea:focus, input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(59,130,246,0.2)}
+  textarea[readonly]{opacity:0.9}
+
+  .actions-row{display:flex;align-items:center;gap:10px;margin:10px 0 18px;flex-wrap:wrap}
+  .btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .btn{
+    appearance:none;border:1px solid var(--border);background:#141d2f;color:var(--text);
+    padding:10px 14px;border-radius:12px;font-size:14px;font-weight:500;cursor:pointer;
+    transition:transform .12s ease, background .2s, border-color .2s;user-select:none
+  }
+  .btn:hover{transform:translateY(-1px);border-color:rgba(255,255,255,0.16);background:#18223a}
+  .btn:active{transform:scale(0.98)}
+  .btn.primary{background:var(--accent);border-color:transparent;color:white;box-shadow:0 6px 20px rgba(59,130,246,0.25)}
+  .btn.primary:hover{background:#2563eb}
+  .btn.ghost{background:transparent}
+  .btn.full{width:100%;margin-top:12px;padding:12px 16px;font-size:15px}
+  .btn.small{font-size:13px;padding:8px 12px}
+  .btn:disabled{opacity:0.6;cursor:not-allowed}
+
+  .input-group{display:flex;align-items:center;background:#0b1220;border:1px solid rgba(255,255,255,0.1);border-radius:12px;overflow:hidden}
+  .input-group input{border:0;background:transparent;flex:1}
+  .input-group:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(59,130,246,0.2)}
+  .link-btn{background:transparent;border:0;color:var(--muted);padding:0 12px;height:100%;cursor:pointer;font-size:13px}
+  .link-btn:hover{color:var(--text)}
+
+  .strength-track{height:4px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden;margin-top:8px}
+  .strength-bar{height:100%;width:0%;background:var(--error);transition:width .3s ease, background .3s}
+  .hint{font-size:12px;color:var(--muted);margin:6px 0 0;min-height:16px}
+  .muted{color:var(--muted);font-size:13px}
+  .info{font-size:13px;color:var(--muted);text-align:center;margin:14px 0 4px}
+  .error{color:var(--error);font-size:13px;margin-top:8px}
+  .hidden{display:none !important}
+
+  .qr-wrap{margin-top:16px;display:flex;flex-direction:column;align-items:center;gap:12px;opacity:0;transform:translateY(6px);transition:all .3s ease}
+  .qr-wrap.show{opacity:1;transform:translateY(0)}
+  #qrCanvas{background:white;padding:12px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,0.4)}
+
+  .reader{width:100%;max-width:360px;margin:12px auto;border-radius:12px;overflow:hidden;border:1px solid var(--border);background:#000}
+  .reader video{width:100% !important}
+
+  .footer{text-align:center;color:var(--muted);font-size:12px;padding:28px 0 0;opacity:0.8}
+
+  @media (max-width:480px){
+    .wrap{padding:0 14px 40px}
+    .card{padding:16px;border-radius:14px}
+    h1{font-size:24px}
+    .btn-row{flex-direction:column}
+    .btn-row .btn{width:100%}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="header">
+    <div class="logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 4v5c0 5-3.5 9-7 9s-7-4-7-9V7l7-4z"/><path d="M9 12l2 2 4-4"/></svg>
+      </div>
+      <h1>EnvVault</h1>
+    </div>
+    <p class="tagline">Encrypt .env locally. Share via QR.</p>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Mode">
+    <button class="tab active" data-tab="encrypt" role="tab" aria-selected="true">Encrypt</button>
+    <button class="tab" data-tab="decrypt" role="tab" aria-selected="false">Decrypt</button>
+  </nav>
+
+  <div class="panels">
+    <section id="panel-encrypt" class="panel active" role="tabpanel">
+      <div class="card">
+        <label for="envInput" class="label">Paste .env</label>
+        <textarea id="envInput" rows="8" spellcheck="false" placeholder="DATABASE_URL=postgres://...
+API_KEY=sk_live_..."></textarea>
+        <div class="actions-row">
+          <button id="uploadEnvBtn" class="btn ghost" type="button">Upload .env</button>
+          <input type="file" id="envFile" accept=".env,text/plain,*/*" hidden>
+          <span class="muted" id="envFileName"></span>
+        </div>
+
+        <label for="encPass" class="label">Password</label>
+        <div class="input-group">
+          <input id="encPass" type="password" autocomplete="new-password" placeholder="Minimum 8 characters">
+          <button type="button" id="toggleEncPass" class="link-btn">Show</button>
+        </div>
+        <div class="strength-track"><div id="strengthBar" class="strength-bar"></div></div>
+        <p id="strengthText" class="hint"></p>
+
+        <button id="encryptBtn" class="btn primary full" type="button">Encrypt</button>
+      </div>
+
+      <div id="encResult" class="card result hidden">
+        <label class="label">Payload</label>
+        <textarea id="payloadOut" rows="5" readonly></textarea>
+        <div class="btn-row">
+          <button id="copyPayload" class="btn" type="button">Copy</button>
+          <button id="downloadVault" class="btn" type="button">Download .vault</button>
+          <button id="showQRBtn" class="btn" type="button">Show QR</button>
+        </div>
+        <div id="qrWrap" class="qr-wrap hidden">
+          <canvas id="qrCanvas" width="256" height="256" aria-label="QR code"></canvas>
+          <button id="downloadQR" class="btn ghost small" type="button">Download QR PNG</button>
+        </div>
+        <p class="info">Share the QR and password separately.</p>
+      </div>
+    </section>
+
+    <section id="panel-decrypt" class="panel" role="tabpanel">
+      <div class="card">
+        <label class="label">Scan or paste payload</label>
+        <div class="btn-row">
+          <button id="scanBtn" class="btn ghost" type="button">Scan QR</button>
+          <button id="uploadVaultBtn" class="btn ghost" type="button">Upload .vault</button>
+          <input type="file" id="vaultFile" accept=".vault,.txt,text/plain" hidden>
+        </div>
+        <div id="reader" class="reader hidden"></div>
+        <textarea id="decPayload" rows="5" spellcheck="false" placeholder="Paste payload here"></textarea>
+
+        <label for="decPass" class="label">Password</label>
+        <div class="input-group">
+          <input id="decPass" type="password" autocomplete="current-password" placeholder="Enter password">
+          <button type="button" id="toggleDecPass" class="link-btn">Show</button>
+        </div>
+
+        <button id="decryptBtn" class="btn primary full" type="button">Decrypt</button>
+        <p id="decError" class="error hidden">Wrong password or invalid data</p>
+      </div>
+
+      <div id="decResult" class="card result hidden">
+        <label class="label">Decrypted .env</label>
+        <textarea id="decOut" rows="8" readonly></textarea>
+        <div class="btn-row">
+          <button id="copyDec" class="btn" type="button">Copy</button>
+          <button id="downloadEnv" class="btn" type="button">Download .env</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <footer class="footer">Everything runs locally. Nothing is uploaded.</footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+(function(){
+  'use strict';
+
+  // ===================== HELPERS =====================
+  const $ = id => document.getElementById(id);
+  const enc = new TextEncoder();
+  const dec = new TextDecoder();
+
+  function buf2b64(buffer){
+    const bytes = new Uint8Array(buffer);
+    let binary='';
+    for(let i=0;i<bytes.byteLength;i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary);
+  }
+  function b642buf(b64){
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for(let i=0;i<binary.length;i++) bytes[i] = binary.charCodeAt(i);
+    return bytes.buffer;
+  }
+
+  // ===================== CRYPTO =====================
+  async function deriveKey(password, salt){
+    const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+    return crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt, iterations: 150000, hash: 'SHA-256' },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt']
+    );
+  }
+
+  async function encryptEnv(plain, password){
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const key = await deriveKey(password, salt);
+    const data = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(plain));
+    const obj = { v: 1, salt: buf2b64(salt), iv: buf2b64(iv), data: buf2b64(data) };
+    return btoa(JSON.stringify(obj));
+  }
+
+  async function decryptEnv(payload, password){
+    const obj = JSON.parse(atob(payload.trim()));
+    if(obj.v !== 1) throw new Error('Unsupported version');
+    const salt = new Uint8Array(b642buf(obj.salt));
+    const iv = new Uint8Array(b642buf(obj.iv));
+    const data = b642buf(obj.data);
+    const key = await deriveKey(password, salt);
+    const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, data);
+    return dec.decode(plainBuf);
+  }
+
+  // ===================== TABS =====================
+  document.querySelectorAll('.tab').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.tab').forEach(b => {
+        b.classList.remove('active');
+        b.setAttribute('aria-selected', 'false');
+      });
+      this.classList.add('active');
+      this.setAttribute('aria-selected', 'true');
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      const panel = $('panel-' + this.dataset.tab);
+      if (panel) panel.classList.add('active');
+      stopScan();
+    });
+  });
+
+  // ===================== TOGGLE PASSWORD =====================
+  function setupToggle(inputId, btnId){
+    const inp = $(inputId), btn = $(btnId);
+    if (!inp || !btn) return;
+    btn.addEventListener('click', function() {
+      const isPassword = inp.type === 'password';
+      inp.type = isPassword ? 'text' : 'password';
+      this.textContent = isPassword ? 'Hide' : 'Show';
+    });
+  }
+  setupToggle('encPass', 'toggleEncPass');
+  setupToggle('decPass', 'toggleDecPass');
+
+  // ===================== PASSWORD STRENGTH =====================
+  const encPass = $('encPass');
+  const strengthBar = $('strengthBar');
+  const strengthText = $('strengthText');
+  if (encPass) {
+    encPass.addEventListener('input', function(e) {
+      const pwd = e.target.value;
+      let score = 0;
+      if (pwd.length >= 8) score++;
+      if (pwd.length >= 12) score++;
+      if (/[a-z]/.test(pwd) && /[A-Z]/.test(pwd)) score++;
+      if (/\d/.test(pwd)) score++;
+      if (/[^A-Za-z0-9]/.test(pwd)) score++;
+      const pct = Math.min(100, score * 20);
+      if (strengthBar) strengthBar.style.width = pct + '%';
+      if (!pwd) {
+        if (strengthText) strengthText.textContent = '';
+        if (strengthBar) strengthBar.style.width = '0%';
+        return;
+      }
+      if (score <= 2) {
+        if (strengthBar) strengthBar.style.background = 'var(--error)';
+        if (strengthText) strengthText.textContent = 'Weak';
+      } else if (score <= 3) {
+        if (strengthBar) strengthBar.style.background = '#f59e0b';
+        if (strengthText) strengthText.textContent = 'Medium';
+      } else {
+        if (strengthBar) strengthBar.style.background = 'var(--success)';
+        if (strengthText) strengthText.textContent = 'Strong';
+      }
+    });
+  }
+
+  // ===================== UPLOAD .ENV =====================
+  const uploadEnvBtn = $('uploadEnvBtn');
+  const envFile = $('envFile');
+  const envInput = $('envInput');
+  const envFileName = $('envFileName');
+  if (uploadEnvBtn && envFile) {
+    uploadEnvBtn.addEventListener('click', () => envFile.click());
+    envFile.addEventListener('change', async function(e) {
+      const f = e.target.files[0];
+      if (!f) return;
+      if (envFileName) envFileName.textContent = f.name;
+      if (envInput) envInput.value = await f.text();
+    });
+  }
+
+  // ===================== ENCRYPT =====================
+  const encryptBtn = $('encryptBtn');
+  if (encryptBtn) {
+    encryptBtn.addEventListener('click', async function() {
+      const plain = envInput ? envInput.value : '';
+      const pwd = encPass ? encPass.value : '';
+      if (!plain.trim()) { alert('Paste .env content'); return; }
+      if (!pwd || pwd.length < 8) { alert('Enter password with at least 8 characters'); return; }
+      try {
+        this.disabled = true;
+        this.textContent = 'Encrypting...';
+        const payload = await encryptEnv(plain, pwd);
+        const out = $('payloadOut');
+        if (out) out.value = payload;
+        const result = $('encResult');
+        if (result) result.classList.remove('hidden');
+        const qrWrap = $('qrWrap');
+        if (qrWrap) {
+          qrWrap.classList.add('hidden');
+          qrWrap.classList.remove('show');
+        }
+        if (result) result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } catch (err) {
+        console.error(err);
+        alert('Encryption failed');
+      } finally {
+        this.disabled = false;
+        this.textContent = 'Encrypt';
+      }
+    });
+  }
+
+  // ===================== PAYLOAD ACTIONS =====================
+  function flash(btn, msg) {
+    const orig = btn.textContent;
+    btn.textContent = msg;
+    setTimeout(() => btn.textContent = orig, 1200);
+  }
+
+  const copyPayload = $('copyPayload');
+  const payloadOut = $('payloadOut');
+  if (copyPayload && payloadOut) {
+    copyPayload.addEventListener('click', function() {
+      navigator.clipboard.writeText(payloadOut.value).then(() => flash(this, 'Copied')).catch(() => alert('Copy failed'));
+    });
+  }
+
+  // Download .vault - FIXED
+  const downloadVault = $('downloadVault');
+  if (downloadVault && payloadOut) {
+    downloadVault.addEventListener('click', function() {
+      const content = payloadOut.value;
+      if (!content) { alert('No payload to download. Encrypt something first.'); return; }
+      try {
+        const blob = new Blob([content], { type: 'text/plain' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'env.vault';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+        flash(this, 'Downloaded');
+      } catch (e) {
+        console.error(e);
+        alert('Download failed: ' + e.message);
+      }
+    });
+  }
+
+  // Show QR - FIXED with library check
+  const showQRBtn = $('showQRBtn');
+  const qrWrap = $('qrWrap');
+  const qrCanvas = $('qrCanvas');
+  if (showQRBtn && qrWrap && qrCanvas && payloadOut) {
+    showQRBtn.addEventListener('click', function() {
+      const payload = payloadOut.value;
+      if (!payload) { alert('No payload to encode.'); return; }
+
+      // Check if QRCode library is loaded
+      if (typeof QRCode === 'undefined') {
+        alert('QR library failed to load. Please check your internet connection and reload.');
+        console.error('QRCode library not defined.');
+        return;
+      }
+
+      try {
+        qrWrap.classList.remove('hidden');
+        QRCode.toCanvas(qrCanvas, payload, {
+          width: 256,
+          margin: 1,
+          errorCorrectionLevel: 'M',
+          color: { dark: '#000000', light: '#ffffff' }
+        }, function(err) {
+          if (err) {
+            console.error(err);
+            alert('QR generation failed: ' + err.message);
+            qrWrap.classList.add('hidden');
+          } else {
+            setTimeout(() => qrWrap.classList.add('show'), 20);
+          }
+        });
+      } catch (e) {
+        console.error(e);
+        alert('QR generation error: ' + e.message);
+      }
+    });
+  }
+
+  // Download QR PNG
+  const downloadQR = $('downloadQR');
+  if (downloadQR && qrCanvas) {
+    downloadQR.addEventListener('click', function() {
+      try {
+        const url = qrCanvas.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'envvault-qr.png';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } catch (e) {
+        alert('Download QR failed: ' + e.message);
+      }
+    });
+  }
+
+  // ===================== SCAN QR =====================
+  let html5Qr = null;
+  let scanning = false;
+
+  async function stopScan() {
+    if (html5Qr && scanning) {
+      try { await html5Qr.stop(); } catch (e) {}
+      try { await html5Qr.clear(); } catch (e) {}
+      scanning = false;
+      const scanBtn = $('scanBtn');
+      if (scanBtn) scanBtn.textContent = 'Scan QR';
+      const reader = $('reader');
+      if (reader) reader.classList.add('hidden');
+    }
+  }
+
+  const scanBtn = $('scanBtn');
+  const readerDiv = $('reader');
+  const decPayload = $('decPayload');
+  if (scanBtn && readerDiv && decPayload) {
+    scanBtn.addEventListener('click', async function() {
+      if (scanning) {
+        await stopScan();
+        return;
+      }
+
+      // Check if library is loaded
+      if (typeof Html5Qrcode === 'undefined') {
+        alert('QR Scanner library failed to load. Please check your internet connection and reload.');
+        console.error('Html5Qrcode not defined.');
+        return;
+      }
+
+      try {
+        readerDiv.classList.remove('hidden');
+        scanning = true;
+        this.textContent = 'Stop Camera';
+
+        if (html5Qr) {
+          try { await html5Qr.clear(); } catch(e) {}
+        }
+        html5Qr = new Html5Qrcode('reader');
+
+        await html5Qr.start(
+          { facingMode: 'environment' },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          function(decodedText) {
+            decPayload.value = decodedText;
+            stopScan();
+          },
+          function() {} // ignore errors
+        );
+      } catch (err) {
+        console.error(err);
+        alert('Camera access denied or unavailable. Please use HTTPS or localhost.');
+        await stopScan();
+      }
+    });
+  }
+
+  // ===================== UPLOAD .VAULT =====================
+  const uploadVaultBtn = $('uploadVaultBtn');
+  const vaultFile = $('vaultFile');
+  if (uploadVaultBtn && vaultFile && decPayload) {
+    uploadVaultBtn.addEventListener('click', () => vaultFile.click());
+    vaultFile.addEventListener('change', async function(e) {
+      const f = e.target.files[0];
+      if (!f) return;
+      try {
+        const text = await f.text();
+        decPayload.value = text.trim();
+      } catch (err) {
+        alert('Failed to read file: ' + err.message);
+      }
+    });
+  }
+
+  // ===================== DECRYPT =====================
+  const decryptBtn = $('decryptBtn');
+  const decPass = $('decPass');
+  const decError = $('decError');
+  const decOut = $('decOut');
+  const decResult = $('decResult');
+  if (decryptBtn && decPayload && decPass) {
+    decryptBtn.addEventListener('click', async function() {
+      if (decError) decError.classList.add('hidden');
+      const payload = decPayload.value.trim();
+      const pwd = decPass.value;
+      if (!payload) { alert('Paste payload or scan QR'); return; }
+      if (!pwd) { alert('Enter password'); return; }
+      try {
+        this.disabled = true;
+        this.textContent = 'Decrypting...';
+        const plain = await decryptEnv(payload, pwd);
+        if (decOut) decOut.value = plain;
+        if (decResult) decResult.classList.remove('hidden');
+        if (decResult) decResult.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } catch (e) {
+        console.error(e);
+        if (decError) decError.classList.remove('hidden');
+      } finally {
+        this.disabled = false;
+        this.textContent = 'Decrypt';
+      }
+    });
+  }
+
+  // ===================== COPY / DOWNLOAD DECRYPTED =====================
+  const copyDec = $('copyDec');
+  if (copyDec && decOut) {
+    copyDec.addEventListener('click', function() {
+      navigator.clipboard.writeText(decOut.value).then(() => flash(this, 'Copied')).catch(() => alert('Copy failed'));
+    });
+  }
+
+  const downloadEnv = $('downloadEnv');
+  if (downloadEnv && decOut) {
+    downloadEnv.addEventListener('click', function() {
+      const content = decOut.value;
+      if (!content) { alert('No decrypted content to download.'); return; }
+      try {
+        const blob = new Blob([content], { type: 'text/plain' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = '.env';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+        flash(this, 'Downloaded');
+      } catch (e) {
+        alert('Download failed: ' + e.message);
+      }
+    });
+  }
+
+  // ===================== SERVICE WORKER (Safe fallback) =====================
+  if ('serviceWorker' in navigator) {
+    try {
+      const code = `const CACHE='envvault-v1';self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./'])));self.skipWaiting()});self.addEventListener('activate',e=>{e.waitUntil(self.clients.claim())});self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)))})`;
+      const blob = new Blob([code], { type: 'text/javascript' });
+      navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(() => {});
+    } catch (_) {}
+  }
+
+  // ===================== CLOSE QR ON PANEL SWITCH =====================
+  // Ensure QR stops if user switches tabs while scanner active
+  window.stopScan = stopScan;
+
+})();
+</script>
+<script>(function(){document.addEventListener("click",function(e){var a=e.target.closest("[data-product-id]");if(!a)return;e.preventDefault();var pid=a.getAttribute("data-product-id");if(pid)parent.postMessage({type:"ecto-artifact-link-click",productId:pid},"*")})})();</script>
+<script>(function(){var loc=location.href.replace(/#.*$/,"");var ATTR_NAMES=["data-product-id","data-productid","data-product_id","product-id","productid","product_id","data-source-entity-id","source-entity-id","source_entity_id","data-product","data-metadata","data-meta"];var DATASET_KEYS=["productId","productid","product_id","sourceEntityId","sourceentityid","source_entity_id","product","metadata","meta"];function readProductId(value){if(typeof value!=="string"||value.length===0)return null;if(/^[0-9]{6,}$/.test(value))return value;var match=value.match(/(?:product(?:_|-)?id|source(?:_|-)?entity(?:_|-)?id)["'=:\s]+([0-9]{6,})/i);return match?match[1]:null}function extractProductId(start){for(var node=start;node&&node!==document.body;node=node.parentElement){for(var i=0;i<ATTR_NAMES.length;i++){var attrValue=node.getAttribute&&node.getAttribute(ATTR_NAMES[i]);var attrProductId=readProductId(attrValue);if(attrProductId)return attrProductId}var dataset=node.dataset||null;if(dataset){for(var j=0;j<DATASET_KEYS.length;j++){var dataValue=dataset[DATASET_KEYS[j]];var dataProductId=readProductId(dataValue);if(dataProductId)return dataProductId}}}return null}document.addEventListener("click",function(e){var target=e.target instanceof Element?e.target:null;if(!target)return;var a=target.closest?target.closest("a[href]"):null;if(!a||!a.href||!/^https?:\/\//.test(a.href))return;if(a.href.replace(/#.*$/,"")===loc)return;var productId=extractProductId(target)||extractProductId(a);if(!productId)return;e.preventDefault();parent.postMessage({type:"ecto-artifact-link-click",productId:productId},"*")},true)})();</script>
+</body>
+</html>
